@@ -5,7 +5,7 @@ process ASHLAR {
     conda "${moduleDir}/environment.yml"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
         'https://depot.galaxyproject.org/singularity/ashlar:1.18.0--pyhdfd78af_0' :
-        'biocontainers/ashlar:1.18.0--pyhdfd78af_0' }"
+        'yuanchen12/rcashlar:latest' }"
 
     input:
     tuple val(meta), path(images, stageAs: 'image*/*')
@@ -36,7 +36,7 @@ process ASHLAR {
     """
     export JAVA_TOOL_OPTIONS='-XX:+PerfDisableSharedMem'
 
-    ashlar \\
+    rcashlar-orion \\
         -o ${prefix}.ome.tif \\
         ${images} \\
         ${args} \\
