@@ -37,11 +37,9 @@ process ASHLAR {
     export JAVA_TOOL_OPTIONS='-XX:+PerfDisableSharedMem'
 
     rcashlar-orion \\
-        -o ${prefix}.ome.tif \\
+        --output-path ${prefix}.ome.tif \\
         ${images} \\
-        ${args} \\
-        ${dfp} \\
-        ${ffp}
+        ${args}
 
     sed -i -E 's/UUID="urn:uuid:[[:xdigit:]]{8}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{12}"/                                                    /g' ${prefix}.ome.tif
 
