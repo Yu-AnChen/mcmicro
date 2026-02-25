@@ -41,7 +41,19 @@ process ASHLAR {
         ${images} \\
         ${args}
 
-    sed -i -E 's/UUID="urn:uuid:[[:xdigit:]]{8}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{12}"/                                                    /g' ${prefix}.ome.tif
+    python3 -c "
+import tifffile, re, sys
+filename = sys.argv[1]
+pattern = r'UUID=\"urn:uuid:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\"'
+with tifffile.TiffFile(filename) as tif:
+    tag = tif.pages[0].tags[270]
+    xml_offset = tag.valueoffset
+    xml_str = tag.value
+new_xml = re.sub(pattern, lambda m: ' ' * len(m.group()), xml_str)
+with open(filename, 'r+b') as f:
+    f.seek(xml_offset)
+    f.write(new_xml.encode())
+" ${prefix}.ome.tif
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
