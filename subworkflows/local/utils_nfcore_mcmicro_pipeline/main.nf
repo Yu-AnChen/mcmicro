@@ -35,6 +35,8 @@ workflow PIPELINE_INITIALISATION {
     outdir            //  string: The output directory where the results will be saved
     input_cycle       //  string: Path to input_cycle samplesheet
     input_sample      //  string: Path to input_sample samplesheet
+    input_registered  //  string: Path to input_registered samplesheet
+    input_segmented   //  string: Path to input_segmented samplesheet
     marker_sheet      //  string: Path to marker_sheet
     help              // boolean: Display help message and exit
     help_full         // boolean: Show the full help message
@@ -101,8 +103,12 @@ workflow PIPELINE_INITIALISATION {
     validateInputParameters()
 
     //
-    // Create channel from input file provided through params.input_cycle or .input_sample
+    // Create channel from input file provided through params
     //
+    ch_samplesheet = channel.empty()
+    ch_registered  = channel.empty()
+    ch_segmented   = channel.empty()
+
     if (input_cycle) {
         ch_samplesheet = channel.fromList(samplesheetToList(params.input_cycle, "${projectDir}/assets/schema_input_cycle.json"))
             .dump(tag: 'ch_samplesheet (cycle)')
@@ -110,6 +116,16 @@ workflow PIPELINE_INITIALISATION {
         ch_samplesheet = channel.fromList(samplesheetToList(params.input_sample, "${projectDir}/assets/schema_input_sample.json"))
             .flatMap { expandSampleRow(it) }
             .dump(tag: 'ch_samplesheet (sample)')
+    } else if (input_registered) {
+        ch_registered = channel.fromList(
+            samplesheetToList(params.input_registered, "${projectDir}/assets/schema_input_registered.json")
+        ).map { meta, image -> [meta, file(image)] }
+            .dump(tag: 'ch_registered')
+    } else if (input_segmented) {
+        ch_segmented = channel.fromList(
+            samplesheetToList(params.input_segmented, "${projectDir}/assets/schema_input_segmented.json")
+        ).map { meta, image, mask -> [meta, file(image), file(mask)] }
+            .dump(tag: 'ch_segmented')
     }
 
     ch_markersheet = channel.fromList(samplesheetToList(params.marker_sheet, "${projectDir}/assets/schema_marker.json"))
@@ -118,14 +134,18 @@ workflow PIPELINE_INITIALISATION {
         .map{ validateInputMarkersheet(it) }
         .dump(tag: 'ch_markersheet')
 
-    ch_samplesheet.toList()
-        .concat(ch_markersheet)
-        .toList()
-        .map{ samples, markers -> validateInputSamplesheetMarkersheet(samples, markers) }
+    if (input_cycle || input_sample) {
+        ch_samplesheet.toList()
+            .concat(ch_markersheet)
+            .toList()
+            .map{ samples, markers -> validateInputSamplesheetMarkersheet(samples, markers) }
+    }
 
     emit:
     samplesheet = ch_samplesheet
     markersheet = ch_markersheet
+    registered  = ch_registered
+    segmented   = ch_segmented
     versions    = ch_versions
 }
 
@@ -187,10 +207,11 @@ workflow PIPELINE_COMPLETION {
 //
 def validateInputParameters() {
 
-    if (params.input_sample && params.input_cycle) {
-        error "You must specify EITHER input_sample OR input_cycle, but not both."
-    } else if(!params.input_sample && !params.input_cycle) {
-        error "You must specify either input_sample or input_cycle."
+    def inputs = [params.input_sample, params.input_cycle, params.input_registered, params.input_segmented].findAll { it }
+    if (inputs.size() > 1) {
+        error "You must specify exactly one of --input_sample, --input_cycle, --input_registered, or --input_segmented."
+    } else if (inputs.size() == 0) {
+        error "You must specify one of --input_sample, --input_cycle, --input_registered, or --input_segmented."
     }
 
     if (params.cellpose_model && !segmentation_list.contains('cellpose')) {

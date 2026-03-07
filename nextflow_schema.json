@@ -34,6 +34,28 @@
                     "fa_icon": "fas fa-file-csv",
                     "schema": "/assets/schema_input_cycle.json"
                 },
+                "input_registered": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "mimetype": "text/csv",
+                    "pattern": "^\\S+\\.csv$",
+                    "description": "Path to comma-separated file containing pre-registered images, skipping ASHLAR and earlier steps.",
+                    "help_text": "Use this to resume the pipeline from the segmentation step using pre-existing registered images. The file must have 'sample' and 'registered_image' columns, and optionally 'pixel_size' (required for TMA de-arraying).",
+                    "fa_icon": "fas fa-file-csv",
+                    "schema": "/assets/schema_input_registered.json"
+                },
+                "input_segmented": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "mimetype": "text/csv",
+                    "pattern": "^\\S+\\.csv$",
+                    "description": "Path to comma-separated file containing pre-segmented images and masks, skipping ASHLAR and segmentation.",
+                    "help_text": "Use this to resume the pipeline from the quantification step using pre-existing registered images and segmentation masks. The file must have 'sample', 'registered_image', 'mask', and 'segmenter' columns. Multiple rows with the same sample+segmenter are grouped into one MCQUANT call.",
+                    "fa_icon": "fas fa-file-csv",
+                    "schema": "/assets/schema_input_segmented.json"
+                },
                 "outdir": {
                     "type": "string",
                     "format": "directory-path",

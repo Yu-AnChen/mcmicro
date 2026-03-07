@@ -1,0 +1,29 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://raw.githubusercontent.com/nf-core/mcmicro/master/assets/schema_input_registered.json",
+    "title": "nf-core/mcmicro pipeline - params.input_registered schema",
+    "description": "Schema for the file provided with params.input_registered",
+    "type": "array",
+    "items": {
+        "type": "object",
+        "properties": {
+            "sample": {
+                "type": "string",
+                "pattern": "^\\S+$",
+                "errorMessage": "sample name must be provided and cannot contain spaces",
+                "meta": "id"
+            },
+            "registered_image": {
+                "type": "string",
+                "pattern": "^\\S+$",
+                "errorMessage": "Need to provide a path to a registered image file"
+            },
+            "pixel_size": {
+                "type": "number",
+                "errorMessage": "pixel_size must be a number (microns per pixel); required for TMA de-arraying",
+                "meta": "pixel_size"
+            }
+        },
+        "required": ["sample", "registered_image"]
+    }
+}

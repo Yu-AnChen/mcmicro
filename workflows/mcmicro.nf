@@ -33,84 +33,124 @@ workflow MCMICRO {
     take:
     ch_samplesheet // channel: samplesheet read in from --input_cycle or --input_sample
     ch_markersheet // channel: markersheet read in from --marker_sheet
+    ch_registered  // channel: from --input_registered (empty otherwise)
+    ch_segmented   // channel: from --input_segmented (empty otherwise)
 
     main:
     ch_versions = channel.empty()
     ch_multiqc_files = channel.empty()
 
-    ch_samplesheet.map{meta, image_tiles, dfp, ffp -> [meta, image_tiles]} | BFTOOLS_SHOWINF
-    ch_versions = ch_versions.mix(BFTOOLS_SHOWINF.out.versions)
+    // Initialize post_registration as empty; assigned below based on input type
+    post_registration = channel.empty()
 
-    PRELUDE(ch_markersheet, ch_samplesheet, BFTOOLS_SHOWINF.out.xml)
+    if (!params.input_registered && !params.input_segmented) {
 
-    ch_multiqc_files = ch_multiqc_files.mix(PRELUDE.out.output_file_samplesheet)
-                        .mix(PRELUDE.out.output_file_xml)
-                        .mix(PRELUDE.out.output_file_markersheet)
+        ch_samplesheet.map{meta, image_tiles, dfp, ffp -> [meta, image_tiles]} | BFTOOLS_SHOWINF
+        ch_versions = ch_versions.mix(BFTOOLS_SHOWINF.out.versions)
 
-    if (!params.prelude) {
-        metadata    = UPDATE_FROM_OME(ch_samplesheet, ch_markersheet, BFTOOLS_SHOWINF.out.xml)
+        PRELUDE(ch_markersheet, ch_samplesheet, BFTOOLS_SHOWINF.out.xml)
 
-        ch_samplesheet = metadata.samplesheet
-        ch_markersheet = metadata.markersheet
+        ch_multiqc_files = ch_multiqc_files.mix(PRELUDE.out.output_file_samplesheet)
+                            .mix(PRELUDE.out.output_file_xml)
+                            .mix(PRELUDE.out.output_file_markersheet)
 
-        ch_samplesheet.dump(tag: "ch_samplesheet")
-        ch_markersheet.dump(tag: "ch_markersheet")
+        if (!params.prelude) {
+            metadata    = UPDATE_FROM_OME(ch_samplesheet, ch_markersheet, BFTOOLS_SHOWINF.out.xml)
 
-        //
-        // MODULE: BASICPY
-        //
-        if (params.illumination == 'basicpy') {
+            ch_samplesheet = metadata.samplesheet
+            ch_markersheet = metadata.markersheet
+
+            ch_samplesheet.dump(tag: "ch_samplesheet")
+            ch_markersheet.dump(tag: "ch_markersheet")
+
+            //
+            // MODULE: BASICPY
+            //
+            if (params.illumination == 'basicpy') {
+                ch_samplesheet
+                    .map{ meta, image_tiles, dfp, ffp -> [meta, image_tiles] }
+                    .dump(tag: 'BASICPY in')
+                    | BASICPY
+                ch_versions = ch_versions.mix(BASICPY.out.versions)
+                ch_samplesheet = ch_samplesheet
+                    .map{ meta, image_tiles, dfp, ffp -> [meta, image_tiles] }
+                    .join(BASICPY.out.profiles)
+                    .dump(tag: 'ch_samplesheet (after BASICPY)')
+            }
+
             ch_samplesheet
-                .map{ meta, image_tiles, dfp, ffp -> [meta, image_tiles] }
-                .dump(tag: 'BASICPY in')
-                | BASICPY
-            ch_versions = ch_versions.mix(BASICPY.out.versions)
-            ch_samplesheet = ch_samplesheet
-                .map{ meta, image_tiles, dfp, ffp -> [meta, image_tiles] }
-                .join(BASICPY.out.profiles)
-                .dump(tag: 'ch_samplesheet (after BASICPY)')
-        }
-
-        ch_samplesheet
-            .map{ meta, image_tiles, dfp, ffp ->
-                [meta.subMap('id', 'pixel_size'), [meta.cycle_number, image_tiles, dfp, ffp]]
-            }
-            // FIXME: pass groupTuple size: from samplesheet cycle count
-            .groupTuple(sort: { a, b -> a[0] <=> b[0] } )
-            .map{ meta, cycles -> [meta, *cycles.collect{ it[1..-1] }.transpose()]}
-            .dump(tag: 'ASHLAR in')
-            // flatten() handles list of empty-lists, turning it into a single empty list.
-            .multiMap{ meta, images, dfps, ffps ->
-                images: [meta, images]
-                dfps: dfps.flatten()
-                ffps: ffps.flatten()
-            }
-            | ASHLAR
-        ch_versions = ch_versions.mix(ASHLAR.out.versions)
-
-        // Run Background Correction
-        if (params.backsub) {
-            ch_backsub_markers = ch_markersheet
-                .map { ['channel_number,cycle_number,marker_name,exposure,background,remove',
-                    it.collect{ it.channel_number + "," + it.cycle_number + "," + it.marker_name + "," + it.exposure + "," + it.background + "," + it.remove}] }
-                .flatten()
-                .map { it.replaceAll('(?<=,|^)null(?=,|$)', '') }
-                .collectFile(name: 'markers_backsub.csv', sort: false, newLine: true)
-
-            ASHLAR.out.tif
-                .combine(ch_backsub_markers)
-                .dump(tag: 'BACKSUB IN')
-                .multiMap{ meta, image, marker ->
-                    image: [meta, image]
-                    markers: [meta, marker]
+                .map{ meta, image_tiles, dfp, ffp ->
+                    [meta.subMap('id', 'pixel_size'), [meta.cycle_number, image_tiles, dfp, ffp]]
                 }
-                | BACKSUB
+                // FIXME: pass groupTuple size: from samplesheet cycle count
+                .groupTuple(sort: { a, b -> a[0] <=> b[0] } )
+                .map{ meta, cycles -> [meta, *cycles.collect{ it[1..-1] }.transpose()]}
+                .dump(tag: 'ASHLAR in')
+                // flatten() handles list of empty-lists, turning it into a single empty list.
+                .multiMap{ meta, images, dfps, ffps ->
+                    images: [meta, images]
+                    dfps: dfps.flatten()
+                    ffps: ffps.flatten()
+                }
+                | ASHLAR
+            ch_versions = ch_versions.mix(ASHLAR.out.versions)
 
-            post_registration = BACKSUB.out.backsub_tif
-            ch_versions = ch_versions.mix(BACKSUB.out.versions)
-        } else {
-            post_registration = ASHLAR.out.tif
+            // Run Background Correction
+            if (params.backsub) {
+                ch_backsub_markers = ch_markersheet
+                    .map { ['channel_number,cycle_number,marker_name,exposure,background,remove',
+                        it.collect{ it.channel_number + "," + it.cycle_number + "," + it.marker_name + "," + it.exposure + "," + it.background + "," + it.remove}] }
+                    .flatten()
+                    .map { it.replaceAll('(?<=,|^)null(?=,|$)', '') }
+                    .collectFile(name: 'markers_backsub.csv', sort: false, newLine: true)
+
+                ASHLAR.out.tif
+                    .combine(ch_backsub_markers)
+                    .dump(tag: 'BACKSUB IN')
+                    .multiMap{ meta, image, marker ->
+                        image: [meta, image]
+                        markers: [meta, marker]
+                    }
+                    | BACKSUB
+
+                post_registration = BACKSUB.out.backsub_tif
+                ch_versions = ch_versions.mix(BACKSUB.out.versions)
+            } else {
+                post_registration = ASHLAR.out.tif
+            }
+
+            // Generate samplesheet_registered.csv after ASHLAR
+            ASHLAR.out.tif
+                .map { meta, image ->
+                    "${meta.id},${params.outdir}/registration/ashlar/${image.name}"
+                }
+                .collectFile(
+                    name: 'samplesheet_registered.csv',
+                    seed: 'sample,registered_image\n',
+                    sort: true, newLine: true,
+                    storeDir: "${params.outdir}/registration/ashlar"
+                )
+
         }
+    }
+
+    if (params.input_registered) {
+        post_registration = ch_registered
+    }
+
+    // Generate markers.csv for mcquant with just the marker_name column, and
+    // omitting rows removed by backsub.
+    ch_mcquant_markers = channel.of('marker_name')
+        .concat(
+            ch_markersheet
+                .flatten()
+                .filter{ row -> !(params.backsub && row.remove) }
+                .map{ row -> '"' + row.marker_name + '"' }
+        )
+        .dump(tag: "MARKERS")
+        .collectFile(name: 'markers.csv', sort: false, newLine: true)
+
+    if (!params.input_segmented) {
 
         // Run Coreograph
         if (params.tma_dearray) {
@@ -153,28 +193,62 @@ workflow MCMICRO {
         ch_masks = ch_masks.mix(MCCELLPOSE.out.mask)
         ch_versions = ch_versions.mix(MCCELLPOSE.out.versions)
 
-        // Run Quantification
-
-        // Generate markers.csv for mcquant with just the marker_name column, and
-        // omitting rows removed by backsub.
-        ch_mcquant_markers = channel.of('marker_name')
-            .concat(
-                ch_markersheet
-                    .flatten()
-                    .filter{ row -> !(params.backsub && row.remove) }
-                    .map{ row -> '"' + row.marker_name + '"' }
-            )
-            .dump(tag: "MARKERS")
-            .collectFile(name: 'markers.csv', sort: false, newLine: true)
-
+        // Generate samplesheet_segmented.csv after segmentation
+        def img_pubdir = params.backsub
+            ? "${params.outdir}/backsub"
+            : "${params.outdir}/registration/ashlar"
         ch_segmentation_input
             .cross(ch_masks) { it[0]['id'] }
-            .map{ t_ashlar, t_mask -> [t_mask[0], t_ashlar[1], t_mask[1]] }
+            .map { t_img, t_mask ->
+                def seg_pubdir = "${params.outdir}/segmentation/${t_mask[0].segmenter}"
+                "${t_mask[0].id},${img_pubdir}/${t_img[1].name},${seg_pubdir}/${t_mask[1].name},${t_mask[0].segmenter}"
+            }
+            .collectFile(
+                name: 'samplesheet_segmented.csv',
+                seed: 'sample,registered_image,mask,segmenter\n',
+                sort: true, newLine: true,
+                storeDir: "${params.outdir}/segmentation"
+            )
+
+        // Run Quantification — group masks by (id, segmenter) for multi-mask support
+        ch_masks_grouped = ch_masks.groupTuple()
+
+        ch_segmentation_input
+            .cross(ch_masks_grouped) { it[0]['id'] }
+            .map{ t_img, t_mask -> [t_mask[0], t_img[1], t_mask[1]] }
             .combine(ch_mcquant_markers)
             .dump(tag: 'MCQUANT IN')
-            .multiMap{ meta, image, mask, marker ->
-                image: [meta, image]
-                mask: [meta, mask]
+            .multiMap{ meta, image, masks, marker ->
+                image:   [meta, image]
+                mask:    [meta, masks]
+                markers: [meta, marker]
+            }
+            | MCQUANT
+
+        ch_versions = ch_versions.mix(MCQUANT.out.versions)
+
+    }
+
+    if (params.input_segmented) {
+
+        // unique images per sample (drop segmenter from meta for image channel)
+        ch_seg_images = ch_segmented
+            .map { meta, image, mask -> [meta.subMap('id'), image] }
+            .unique { it[0] }
+
+        // masks grouped by [id, segmenter] — preserves samplesheet row order within each group
+        ch_seg_masks = ch_segmented
+            .map { meta, image, mask -> [meta, mask] }
+            .groupTuple()
+
+        ch_seg_images
+            .cross(ch_seg_masks) { it[0]['id'] }
+            .map { t_img, t_mask -> [t_mask[0], t_img[1], t_mask[1]] }
+            .combine(ch_mcquant_markers)
+            .dump(tag: 'MCQUANT IN (segmented)')
+            .multiMap { meta, image, masks, marker ->
+                image:   [meta, image]
+                mask:    [meta, masks]
                 markers: [meta, marker]
             }
             | MCQUANT

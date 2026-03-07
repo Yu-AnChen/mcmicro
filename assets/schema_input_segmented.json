@@ -1,0 +1,35 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://raw.githubusercontent.com/nf-core/mcmicro/master/assets/schema_input_segmented.json",
+    "title": "nf-core/mcmicro pipeline - params.input_segmented schema",
+    "description": "Schema for the file provided with params.input_segmented",
+    "type": "array",
+    "items": {
+        "type": "object",
+        "properties": {
+            "sample": {
+                "type": "string",
+                "pattern": "^\\S+$",
+                "errorMessage": "sample name must be provided and cannot contain spaces",
+                "meta": "id"
+            },
+            "registered_image": {
+                "type": "string",
+                "pattern": "^\\S+$",
+                "errorMessage": "Need to provide a path to a registered image file"
+            },
+            "mask": {
+                "type": "string",
+                "pattern": "^\\S+$",
+                "errorMessage": "Need to provide a path to a segmentation mask file"
+            },
+            "segmenter": {
+                "type": "string",
+                "pattern": "^\\S+$",
+                "errorMessage": "segmenter name must be provided and cannot contain spaces",
+                "meta": "segmenter"
+            }
+        },
+        "required": ["sample", "registered_image", "mask", "segmenter"]
+    }
+}

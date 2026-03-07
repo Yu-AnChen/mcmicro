@@ -29,6 +29,8 @@ nextflow_workflow {
                         [channel_number: 4, cycle_number: 1, marker_name: 'CD45RO'],
                     ],
                 )
+                input[2] = Channel.empty()
+                input[3] = Channel.empty()
                 """
             }
         }
@@ -68,6 +70,8 @@ nextflow_workflow {
                         [channel_number: 4, cycle_number: 1, marker_name: 'CD45RO'],
                     ],
                 )
+                input[2] = Channel.empty()
+                input[3] = Channel.empty()
                 """
             }
         }
@@ -76,6 +80,84 @@ nextflow_workflow {
             assertAll(
                 { assert workflow.success },
                 { assert workflow.out.versions.size() == 1} //showinf
+            )
+        }
+
+    }
+
+    test("test input_registered") {
+
+        when {
+            params {
+                outdir       = "$outputDir"
+                segmentation = "mccellpose"
+                input_registered = "samplesheet_registered.csv"
+            }
+            workflow {
+                """
+                input[0] = Channel.empty()
+                input[1] = Channel.of(
+                    [
+                        [channel_number: 1, cycle_number: 1, marker_name: 'DNA 1'],
+                        [channel_number: 2, cycle_number: 1, marker_name: 'Na/K ATPase'],
+                        [channel_number: 3, cycle_number: 1, marker_name: 'CD3'],
+                        [channel_number: 4, cycle_number: 1, marker_name: 'CD45RO'],
+                    ],
+                )
+                input[2] = Channel.of(
+                    [
+                        [id:"TEST1", pixel_size: 0.65],
+                        file("https://raw.githubusercontent.com/nf-core/test-datasets/modules/data/imaging/ome-tiff/cycif-tonsil-cycle1.ome.tif"),
+                    ],
+                )
+                input[3] = Channel.empty()
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert workflow.success },
+                { assert workflow.out.versions.size() >= 1 }
+            )
+        }
+
+    }
+
+    test("test input_segmented") {
+
+        when {
+            params {
+                outdir           = "$outputDir"
+                input_segmented  = "samplesheet_segmented.csv"
+            }
+            workflow {
+                """
+                input[0] = Channel.empty()
+                input[1] = Channel.of(
+                    [
+                        [channel_number: 1, cycle_number: 1, marker_name: 'DNA 1'],
+                        [channel_number: 2, cycle_number: 1, marker_name: 'Na/K ATPase'],
+                        [channel_number: 3, cycle_number: 1, marker_name: 'CD3'],
+                        [channel_number: 4, cycle_number: 1, marker_name: 'CD45RO'],
+                    ],
+                )
+                input[2] = Channel.empty()
+                input[3] = Channel.of(
+                    [
+                        [id:"TEST1", segmenter: "mccellpose"],
+                        file("https://raw.githubusercontent.com/nf-core/test-datasets/modules/data/imaging/ome-tiff/cycif-tonsil-cycle1.ome.tif"),
+                        file("https://raw.githubusercontent.com/nf-core/test-datasets/modules/data/imaging/ome-tiff/cycif-tonsil-cycle1.ome.tif"),
+                    ],
+                )
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert workflow.success },
+                { assert workflow.out.versions.size() >= 1 }
             )
         }
 

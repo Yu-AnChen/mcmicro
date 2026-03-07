@@ -31,8 +31,10 @@ include { PIPELINE_COMPLETION     } from './subworkflows/local/utils_nfcore_mcmi
 workflow NFCORE_MCMICRO {
 
     take:
-    samplesheet // channel: samplesheet read in from --input_cycle or --input_sample
-    markersheet // channel: markersheet read in from --marker_sheet
+    samplesheet  // channel: samplesheet read in from --input_cycle or --input_sample
+    markersheet  // channel: markersheet read in from --marker_sheet
+    registered   // channel: from --input_registered (empty otherwise)
+    segmented    // channel: from --input_segmented (empty otherwise)
 
     main:
 
@@ -41,7 +43,9 @@ workflow NFCORE_MCMICRO {
     //
     MCMICRO (
         samplesheet,
-        markersheet
+        markersheet,
+        registered,
+        segmented
     )
     emit:
     multiqc_report = MCMICRO.out.multiqc_report // channel: /path/to/multiqc_report.html
@@ -66,6 +70,8 @@ workflow {
         params.outdir,
         params.input_cycle,
         params.input_sample,
+        params.input_registered,
+        params.input_segmented,
         params.marker_sheet,
         params.help,
         params.help_full,
@@ -77,7 +83,9 @@ workflow {
     //
     NFCORE_MCMICRO (
         PIPELINE_INITIALISATION.out.samplesheet,
-        PIPELINE_INITIALISATION.out.markersheet
+        PIPELINE_INITIALISATION.out.markersheet,
+        PIPELINE_INITIALISATION.out.registered,
+        PIPELINE_INITIALISATION.out.segmented
     )
     //
     // SUBWORKFLOW: Run completion tasks

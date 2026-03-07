@@ -7,7 +7,7 @@ process MCQUANT {
 
     input:
     tuple val(meta), path(image)
-    tuple val(meta2), path(mask)
+    tuple val(meta2), path(masks)
     tuple val(meta3), path(markerfile)
 
     output:
@@ -23,7 +23,7 @@ process MCQUANT {
     def VERSION = '1.5.4' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
     """
     python /app/CommandSingleCellExtraction.py \
-        --masks $mask \
+        --masks $masks \
         --image $image \
         --channel_names $markerfile \
         --output . \
