@@ -25,7 +25,18 @@ process EXTRACT_MARKERS {
     import sys, re, argparse, xml.etree.ElementTree as ET, csv
 
     def find_channels(root):
-        # Use {*} wildcard to match Channel elements in any namespace (Python 3.8+)
+        # Get Channel elements from the first Pixels element only.
+        # Multi-FOV OME-XML has one Image/Pixels block per tile, each with an
+        # identical channel list — collecting from all series gives duplicates.
+        pixels = root.find('.//{*}Pixels')
+        if pixels is None:
+            pixels = root.find('.//Pixels')
+        if pixels is not None:
+            channels = pixels.findall('{*}Channel')
+            if not channels:
+                channels = pixels.findall('Channel')
+            return channels
+        # Fallback for bare XML without a Pixels wrapper
         channels = root.findall('.//{*}Channel')
         if not channels:
             channels = root.findall('.//Channel')
@@ -61,7 +72,7 @@ process EXTRACT_MARKERS {
         pattern = re.compile(pargs.replace)
         names = [pattern.sub('', n) for n in names]
 
-    placeholder = re.compile(r'^Channel\\s*\\d+$', re.IGNORECASE)
+    placeholder = re.compile(r'^Channel\\s*\\d+\$', re.IGNORECASE)
     for name in names:
         if placeholder.match(name):
             print(f'!!! WARNING !!! Channel name looks like an unset OME placeholder: "{name}"', file=sys.stderr)
