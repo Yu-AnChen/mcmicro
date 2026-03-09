@@ -46,6 +46,9 @@ workflow MCMICRO {
     // Per-sample markers file channel (used when --marker_sheet is not provided)
     ch_per_sample_markers = channel.empty()
 
+    // Resolve outdir to an absolute path so generated samplesheets are portable
+    def outdir_abs = file(params.outdir).toAbsolutePath().toString()
+
     if (!params.input_registered && !params.input_segmented) {
 
         ch_samplesheet.map{meta, image_tiles, dfp, ffp -> [meta, image_tiles]} | BFTOOLS_SHOWINF
@@ -149,7 +152,7 @@ workflow MCMICRO {
             // Generate samplesheet_registered.csv after ASHLAR
             ASHLAR.out.tif
                 .map { meta, image ->
-                    "${meta.id},${params.outdir}/registration/ashlar/${image.name}"
+                    "${meta.id},${outdir_abs}/registration/ashlar/${image.name}"
                 }
                 .collectFile(
                     name: 'samplesheet_registered.csv',
@@ -257,12 +260,12 @@ workflow MCMICRO {
 
         // Generate samplesheet_segmented.csv after segmentation
         def img_pubdir = params.backsub
-            ? "${params.outdir}/backsub"
-            : "${params.outdir}/registration/ashlar"
+            ? "${outdir_abs}/backsub"
+            : "${outdir_abs}/registration/ashlar"
         ch_segmentation_input
             .cross(ch_masks) { it[0]['id'] }
             .flatMap { t_img, t_mask ->
-                def seg_pubdir = "${params.outdir}/segmentation/${t_mask[0].segmenter}"
+                def seg_pubdir = "${outdir_abs}/segmentation/${t_mask[0].segmenter}"
                 def masks = t_mask[1] instanceof List ? t_mask[1] : [t_mask[1]]
                 masks.collect { mask ->
                     "${t_mask[0].id},${img_pubdir}/${t_img[1].name},${seg_pubdir}/${mask.name},${t_mask[0].segmenter}"
