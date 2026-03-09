@@ -128,17 +128,20 @@ workflow PIPELINE_INITIALISATION {
             .dump(tag: 'ch_segmented')
     }
 
-    ch_markersheet = channel.fromList(samplesheetToList(params.marker_sheet, "${projectDir}/assets/schema_marker.json"))
-        // Extract only the meta-maps since we mark all fields as meta.
-        .collect({ it[0] }, flat: false)
-        .map{ validateInputMarkersheet(it) }
-        .dump(tag: 'ch_markersheet')
+    ch_markersheet = channel.empty()
+    if (params.marker_sheet) {
+        ch_markersheet = channel.fromList(samplesheetToList(params.marker_sheet, "${projectDir}/assets/schema_marker.json"))
+            // Extract only the meta-maps since we mark all fields as meta.
+            .collect({ it[0] }, flat: false)
+            .map{ validateInputMarkersheet(it) }
+            .dump(tag: 'ch_markersheet')
 
-    if (input_cycle || input_sample) {
-        ch_samplesheet.toList()
-            .concat(ch_markersheet)
-            .toList()
-            .map{ samples, markers -> validateInputSamplesheetMarkersheet(samples, markers) }
+        if (input_cycle || input_sample) {
+            ch_samplesheet.toList()
+                .concat(ch_markersheet)
+                .toList()
+                .map{ samples, markers -> validateInputSamplesheetMarkersheet(samples, markers) }
+        }
     }
 
     emit:
@@ -216,6 +219,16 @@ def validateInputParameters() {
 
     if (params.cellpose_model && !segmentation_list.contains('cellpose')) {
         error "You can only provide a cellpose model if you have selected cellpose as one of your segmentation methods"
+    }
+
+    if (params.backsub && !params.marker_sheet) {
+        error "Background subtraction (--backsub) requires an explicit --marker_sheet"
+    }
+    if (!params.marker_sheet && params.tma_dearray) {
+        error "--tma_dearray requires --marker_sheet (pixel_size not available without it)"
+    }
+    if (!params.marker_sheet && params.segmentation && params.segmentation.split(',').contains('mesmer')) {
+        error "--segmentation mesmer requires --marker_sheet (pixel_size not available without it)"
     }
 }
 

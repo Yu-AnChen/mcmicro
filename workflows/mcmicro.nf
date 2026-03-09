@@ -21,6 +21,7 @@ include { SCIMAP_MCMICRO         } from '../modules/nf-core/scimap/mcmicro/main'
 include { MCQUANT                } from '../modules/nf-core/mcquant/main'
 include { BFTOOLS_SHOWINF        } from '../modules/nf-core/bftools/showinf/main'
 include { PRELUDE                } from '../subworkflows/local/prelude/main'
+include { EXTRACT_MARKERS        } from '../modules/local/extract_markers/main'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -42,23 +43,49 @@ workflow MCMICRO {
 
     // Initialize post_registration as empty; assigned below based on input type
     post_registration = channel.empty()
+    // Per-sample markers file channel (used when --marker_sheet is not provided)
+    ch_per_sample_markers = channel.empty()
 
     if (!params.input_registered && !params.input_segmented) {
 
         ch_samplesheet.map{meta, image_tiles, dfp, ffp -> [meta, image_tiles]} | BFTOOLS_SHOWINF
         ch_versions = ch_versions.mix(BFTOOLS_SHOWINF.out.versions)
 
-        PRELUDE(ch_markersheet, ch_samplesheet, BFTOOLS_SHOWINF.out.xml)
+        if (!params.marker_sheet) {
+            EXTRACT_MARKERS(BFTOOLS_SHOWINF.out.xml)
+            ch_versions = ch_versions.mix(EXTRACT_MARKERS.out.versions)
+            // Build per-sample markers file: group CSVs by id, sort by cycle_number, extract marker_name
+            ch_per_sample_markers = EXTRACT_MARKERS.out.csv
+                .map { meta, csv -> [meta.subMap('id'), meta.cycle_number, csv] }
+                .groupTuple(by: 0)
+                .map { meta, cycle_nums, csvs ->
+                    def sorted = [cycle_nums, csvs].transpose()
+                        .sort { a, b -> a[0] <=> b[0] }
+                    def content = 'marker_name\n' + sorted.collectMany { cycle_n, f ->
+                        f.readLines().drop(1).findAll { it.trim() }.collect { line ->
+                            '"' + line.split(',', 3)[2].trim().replaceAll('^"|"$', '') + '"'
+                        }
+                    }.join('\n') + '\n'
+                    [meta, content]
+                }
+                .collectFile { meta, content -> ["${meta.id}_markers.csv", content] }
+                .map { f -> [[id: f.name.replaceFirst('_markers\\.csv$', '')], f] }
+        }
+
+        PRELUDE(params.marker_sheet ? ch_markersheet : channel.empty(), ch_samplesheet, BFTOOLS_SHOWINF.out.xml)
 
         ch_multiqc_files = ch_multiqc_files.mix(PRELUDE.out.output_file_samplesheet)
                             .mix(PRELUDE.out.output_file_xml)
                             .mix(PRELUDE.out.output_file_markersheet)
 
         if (!params.prelude) {
-            metadata    = UPDATE_FROM_OME(ch_samplesheet, ch_markersheet, BFTOOLS_SHOWINF.out.xml)
-
-            ch_samplesheet = metadata.samplesheet
-            ch_markersheet = metadata.markersheet
+            if (params.marker_sheet) {
+                metadata    = UPDATE_FROM_OME(ch_samplesheet, ch_markersheet, BFTOOLS_SHOWINF.out.xml)
+                ch_samplesheet = metadata.samplesheet
+                ch_markersheet = metadata.markersheet
+            }
+            // if !marker_sheet: skip UPDATE_FROM_OME; ch_samplesheet has no pixel_size
+            // (mesmer + tma_dearray already guarded by validation errors)
 
             ch_samplesheet.dump(tag: "ch_samplesheet")
             ch_markersheet.dump(tag: "ch_markersheet")
@@ -136,19 +163,54 @@ workflow MCMICRO {
 
     if (params.input_registered) {
         post_registration = ch_registered
+        if (!params.marker_sheet) {
+            EXTRACT_MARKERS(ch_registered)
+            ch_versions = ch_versions.mix(EXTRACT_MARKERS.out.versions)
+            ch_per_sample_markers = EXTRACT_MARKERS.out.csv
+                .map { meta, csv ->
+                    def content = 'marker_name\n' + csv.readLines().drop(1)
+                        .findAll { it.trim() }
+                        .collect { line -> '"' + line.split(',', 3)[2].trim().replaceAll('^"|"$', '') + '"' }
+                        .join('\n') + '\n'
+                    [meta.subMap('id'), content]
+                }
+                .collectFile { meta, content -> ["${meta.id}_markers.csv", content] }
+                .map { f -> [[id: f.name.replaceFirst('_markers\\.csv$', '')], f] }
+        }
+    }
+
+    if (params.input_segmented && !params.marker_sheet) {
+        ch_seg_images_for_markers = ch_segmented
+            .map { meta, image, mask -> [meta.subMap('id'), image] }
+            .unique { it[0] }
+        EXTRACT_MARKERS(ch_seg_images_for_markers)
+        ch_versions = ch_versions.mix(EXTRACT_MARKERS.out.versions)
+        ch_per_sample_markers = EXTRACT_MARKERS.out.csv
+            .map { meta, csv ->
+                def content = 'marker_name\n' + csv.readLines().drop(1)
+                    .findAll { it.trim() }
+                    .collect { line -> '"' + line.split(',', 3)[2].trim().replaceAll('^"|"$', '') + '"' }
+                    .join('\n') + '\n'
+                [meta.subMap('id'), content]
+            }
+            .collectFile { meta, content -> ["${meta.id}_markers.csv", content] }
+            .map { f -> [[id: f.name.replaceFirst('_markers\\.csv$', '')], f] }
     }
 
     // Generate markers.csv for mcquant with just the marker_name column, and
     // omitting rows removed by backsub.
-    ch_mcquant_markers = channel.of('marker_name')
-        .concat(
-            ch_markersheet
-                .flatten()
-                .filter{ row -> !(params.backsub && row.remove) }
-                .map{ row -> '"' + row.marker_name + '"' }
-        )
-        .dump(tag: "MARKERS")
-        .collectFile(name: 'markers.csv', sort: false, newLine: true)
+    if (params.marker_sheet) {
+        ch_mcquant_markers = channel.of('marker_name')
+            .concat(
+                ch_markersheet
+                    .flatten()
+                    .filter{ row -> !(params.backsub && row.remove) }
+                    .map{ row -> '"' + row.marker_name + '"' }
+            )
+            .dump(tag: "MARKERS")
+            .collectFile(name: 'markers.csv', sort: false, newLine: true)
+    }
+    // else: ch_per_sample_markers is used directly in MCQUANT prep below
 
     if (!params.input_segmented) {
 
@@ -214,17 +276,33 @@ workflow MCMICRO {
             )
 
         // Run Quantification
-        ch_segmentation_input
+        def ch_for_mcquant = ch_segmentation_input
             .cross(ch_masks) { it[0]['id'] }
             .map{ t_img, t_mask -> [t_mask[0], t_img[1], t_mask[1]] }
-            .combine(ch_mcquant_markers)
-            .dump(tag: 'MCQUANT IN')
-            .multiMap{ meta, image, masks, marker ->
-                image:   [meta, image]
-                mask:    [meta, masks]
-                markers: [meta, marker]
-            }
-            | MCQUANT
+
+        if (params.marker_sheet) {
+            ch_for_mcquant
+                .combine(ch_mcquant_markers)
+                .dump(tag: 'MCQUANT IN')
+                .multiMap{ meta, image, masks, marker ->
+                    image:   [meta, image]
+                    mask:    [meta, masks]
+                    markers: [meta, marker]
+                }
+                | MCQUANT
+        } else {
+            ch_for_mcquant
+                .map { meta, image, masks -> [meta.subMap('id'), meta, image, masks] }
+                .join(ch_per_sample_markers)
+                .map { id_meta, full_meta, image, masks, markers -> [full_meta, image, masks, markers] }
+                .dump(tag: 'MCQUANT IN')
+                .multiMap { meta, image, masks, markers ->
+                    image:   [meta, image]
+                    mask:    [meta, masks]
+                    markers: [meta, markers]
+                }
+                | MCQUANT
+        }
 
         ch_versions = ch_versions.mix(MCQUANT.out.versions)
 
@@ -242,17 +320,33 @@ workflow MCMICRO {
             .map { meta, image, mask -> [meta, mask] }
             .groupTuple()
 
-        ch_seg_images
+        def ch_for_mcquant_seg = ch_seg_images
             .cross(ch_seg_masks) { it[0]['id'] }
             .map { t_img, t_mask -> [t_mask[0], t_img[1], t_mask[1]] }
-            .combine(ch_mcquant_markers)
-            .dump(tag: 'MCQUANT IN (segmented)')
-            .multiMap { meta, image, masks, marker ->
-                image:   [meta, image]
-                mask:    [meta, masks]
-                markers: [meta, marker]
-            }
-            | MCQUANT
+
+        if (params.marker_sheet) {
+            ch_for_mcquant_seg
+                .combine(ch_mcquant_markers)
+                .dump(tag: 'MCQUANT IN (segmented)')
+                .multiMap { meta, image, masks, marker ->
+                    image:   [meta, image]
+                    mask:    [meta, masks]
+                    markers: [meta, marker]
+                }
+                | MCQUANT
+        } else {
+            ch_for_mcquant_seg
+                .map { meta, image, masks -> [meta.subMap('id'), meta, image, masks] }
+                .join(ch_per_sample_markers)
+                .map { id_meta, full_meta, image, masks, markers -> [full_meta, image, masks, markers] }
+                .dump(tag: 'MCQUANT IN (segmented)')
+                .multiMap { meta, image, masks, markers ->
+                    image:   [meta, image]
+                    mask:    [meta, masks]
+                    markers: [meta, markers]
+                }
+                | MCQUANT
+        }
 
         ch_versions = ch_versions.mix(MCQUANT.out.versions)
 
