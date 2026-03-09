@@ -108,6 +108,11 @@
                 "prelude": {
                     "type": "boolean",
                     "description": "Run the pipeline in prelude mode. Extracts metadata writes MultiQC table and exits."
+                },
+                "stop_after": {
+                    "type": "string",
+                    "enum": ["registration", "segmentation"],
+                    "description": "Stop the pipeline after a specific stage. 'registration' stops after ASHLAR (skips segmentation and quantification). 'segmentation' stops after segmentation (skips quantification)."
                 }
             }
         },
