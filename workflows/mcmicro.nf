@@ -199,9 +199,12 @@ workflow MCMICRO {
             : "${params.outdir}/registration/ashlar"
         ch_segmentation_input
             .cross(ch_masks) { it[0]['id'] }
-            .map { t_img, t_mask ->
+            .flatMap { t_img, t_mask ->
                 def seg_pubdir = "${params.outdir}/segmentation/${t_mask[0].segmenter}"
-                "${t_mask[0].id},${img_pubdir}/${t_img[1].name},${seg_pubdir}/${t_mask[1].name},${t_mask[0].segmenter}"
+                def masks = t_mask[1] instanceof List ? t_mask[1] : [t_mask[1]]
+                masks.collect { mask ->
+                    "${t_mask[0].id},${img_pubdir}/${t_img[1].name},${seg_pubdir}/${mask.name},${t_mask[0].segmenter}"
+                }
             }
             .collectFile(
                 name: 'samplesheet_segmented.csv',
@@ -210,11 +213,9 @@ workflow MCMICRO {
                 storeDir: "${params.outdir}/segmentation"
             )
 
-        // Run Quantification — group masks by (id, segmenter) for multi-mask support
-        ch_masks_grouped = ch_masks.groupTuple()
-
+        // Run Quantification
         ch_segmentation_input
-            .cross(ch_masks_grouped) { it[0]['id'] }
+            .cross(ch_masks) { it[0]['id'] }
             .map{ t_img, t_mask -> [t_mask[0], t_img[1], t_mask[1]] }
             .combine(ch_mcquant_markers)
             .dump(tag: 'MCQUANT IN')
