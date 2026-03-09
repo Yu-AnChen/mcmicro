@@ -22,6 +22,7 @@ include { MCQUANT                } from '../modules/nf-core/mcquant/main'
 include { BFTOOLS_SHOWINF        } from '../modules/nf-core/bftools/showinf/main'
 include { PRELUDE                } from '../subworkflows/local/prelude/main'
 include { EXTRACT_MARKERS        } from '../modules/local/extract_markers/main'
+include { COMPRESS_PYSED         } from '../modules/local/compress_pysed/main'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -53,6 +54,13 @@ workflow MCMICRO {
 
         ch_samplesheet.map{meta, image_tiles, dfp, ffp -> [meta, image_tiles]} | BFTOOLS_SHOWINF
         ch_versions = ch_versions.mix(BFTOOLS_SHOWINF.out.versions)
+
+        // Archive-compress pysed files in parallel (output not used by downstream steps)
+        ch_samplesheet
+            .filter { meta, image_tiles, dfp, ffp -> image_tiles.name.endsWith('.pysed.ome.tif') }
+            .map    { meta, image_tiles, dfp, ffp -> [meta, image_tiles] }
+            | COMPRESS_PYSED
+        ch_versions = ch_versions.mix(COMPRESS_PYSED.out.versions)
 
         if (!params.marker_sheet) {
             EXTRACT_MARKERS(BFTOOLS_SHOWINF.out.xml)
