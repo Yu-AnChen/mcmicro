@@ -116,7 +116,7 @@
                 },
                 "marker_name_replace": {
                     "type": "string",
-                    "default": "^\\d+_",
+                    "default": "^\\d+_(?:[A-Z][a-z]+_)?|_(?:ArgoFluor|Alexa)\\w+$",
                     "description": "Regex pattern applied to channel names auto-extracted from OME metadata. Default strips leading numeric prefixes (e.g. '01_DNA_1' -> 'DNA_1'). Set to an empty string to disable. Only used when --marker_sheet is not provided."
                 }
             }
