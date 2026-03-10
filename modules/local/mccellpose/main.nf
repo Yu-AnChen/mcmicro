@@ -16,7 +16,7 @@ process MCCELLPOSE {
     task.ext.when == null || task.ext.when
 
     script:
-    def args = task.ext.args ?: '--channel 1'
+    def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
     def gpu_args = task.ext.use_gpu ? "--use-gpu --jobs ${task.cpus}" : ''
     """
@@ -27,7 +27,7 @@ process MCCELLPOSE {
         --input $image \
         --output-cell ${prefix}_mask.ome.tif \
         --channel 1 \
-        --expand-size 2 \
+        --expand-size 5 \
         $gpu_args \
         $args
 
