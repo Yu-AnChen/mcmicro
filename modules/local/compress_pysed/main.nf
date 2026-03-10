@@ -2,7 +2,7 @@ process COMPRESS_PYSED {
     tag "${meta.id}_${meta.cycle_number}"
     label 'process_low'
 
-    storeDir "${params.outdir}/cycle_compressed/${meta.id}"
+    storeDir "${params.outdir}/compress/${meta.id}"
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
         'https://depot.galaxyproject.org/singularity/ashlar:1.18.0--pyhdfd78af_0' :
@@ -21,7 +21,7 @@ process COMPRESS_PYSED {
     script:
     """
     python3 << 'PYEOF'
-    import os, sys, shutil, logging
+    import os, sys, shutil, logging, tempfile
     import ome_types, tifffile, tqdm, zarr
     from xsdata.formats.dataclass.parsers.config import ParserConfig
 
@@ -42,22 +42,32 @@ process COMPRESS_PYSED {
         already_compressed = tif.pages[0].compression.value != 0
 
     if already_compressed:
-        print(f"Already compressed, hardlinking: {pysed_path}", file=sys.stderr)
-        try:
-            os.link(pysed_path, out_path)
-        except OSError:
-            shutil.copy2(pysed_path, out_path)
+        if os.path.samefile(pysed_path, out_path):
+            print(f"Already compressed, staged in-place (no-op): {pysed_path}", file=sys.stderr)
+        else:
+            print(f"Already compressed, hardlinking: {pysed_path}", file=sys.stderr)
+            try:
+                os.link(pysed_path, out_path)
+            except OSError:
+                shutil.copy2(pysed_path, out_path)
     else:
         print(f"Compressing: {pysed_path}", file=sys.stderr)
         zimg = zarr.open(tifffile.imread(pysed_path, aszarr=True), mode='r')
-        with tifffile.TiffWriter(out_path, bigtiff=True) as tif_w:
-            for ii in tqdm.trange(len(zimg)):
-                tif_w.write(zimg[ii], compression='zlib')
         parser_config = ParserConfig(
             fail_on_unknown_properties=False, fail_on_unknown_attributes=False
         )
         ome = ome_types.from_tiff(pysed_path, parser_kwargs={'config': parser_config})
-        tifffile.tiffcomment(out_path, ome.to_xml().encode())
+        tmp_fd, tmp_path = tempfile.mkstemp(suffix='.tif', dir='.')
+        os.close(tmp_fd)
+        try:
+            with tifffile.TiffWriter(tmp_path, bigtiff=True) as tif_w:
+                for ii in tqdm.trange(len(zimg)):
+                    tif_w.write(zimg[ii], compression='zlib')
+            tifffile.tiffcomment(tmp_path, ome.to_xml().encode())
+            os.replace(tmp_path, out_path)
+        except Exception:
+            os.unlink(tmp_path)
+            raise
     PYEOF
 
     cat <<-END_VERSIONS > versions.yml

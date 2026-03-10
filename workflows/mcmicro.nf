@@ -57,8 +57,8 @@ workflow MCMICRO {
 
         // Archive-compress pysed files in parallel (output not used by downstream steps)
         ch_samplesheet
-            .filter { meta, image_tiles, dfp, ffp -> image_tiles.name.endsWith('.pysed.ome.tif') }
-            .map    { meta, image_tiles, dfp, ffp -> [meta, image_tiles] }
+            .filter  { it[1].toString().endsWith('.pysed.ome.tif') }
+            .map     { meta, image_tiles, dfp, ffp -> [meta, image_tiles] }
             | COMPRESS_PYSED
         ch_versions = ch_versions.mix(COMPRESS_PYSED.out.versions)
 
