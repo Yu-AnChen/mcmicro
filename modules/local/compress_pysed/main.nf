@@ -2,7 +2,6 @@ process COMPRESS_PYSED {
     tag "${meta.id}_${meta.cycle_number}"
     label 'process_low'
 
-    storeDir "${params.outdir}/compress/${meta.id}"
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
         'https://depot.galaxyproject.org/singularity/ashlar:1.18.0--pyhdfd78af_0' :
@@ -39,7 +38,7 @@ process COMPRESS_PYSED {
     out_path   = '${image_file.name}'
 
     with tifffile.TiffFile(pysed_path) as tif:
-        already_compressed = tif.pages[0].compression.value != 0
+        already_compressed = tif.pages[0].compression != tifffile.COMPRESSION.NONE
 
     if already_compressed:
         if os.path.samefile(pysed_path, out_path):
