@@ -61,7 +61,7 @@ process COMPRESS_PYSED {
         try:
             with tifffile.TiffWriter(tmp_path, bigtiff=True) as tif_w:
                 for ii in tqdm.trange(len(zimg)):
-                    tif_w.write(zimg[ii], compression='zlib')
+                    tif_w.write(zimg[ii], compression='zstd')
             tifffile.tiffcomment(tmp_path, ome.to_xml().encode())
             os.replace(tmp_path, out_path)
         except Exception:
