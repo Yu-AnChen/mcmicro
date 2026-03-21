@@ -23,7 +23,9 @@ process MCCELLPOSE {
     export HOME=\$PWD
     export NUMBA_CACHE_DIR=\$PWD
 
-    mccellpose \
+    python3 -c "import urllib.request; urllib.request.urlretrieve('https://gist.githubusercontent.com/Yu-AnChen/6b93cde76ac7c4e73f49b037891197db/raw/cli.py', 'cli.py')"
+
+    python3 cli.py \
         --input $image \
         --output-cell ${prefix}_mask.ome.tif \
         --channel 1 \
