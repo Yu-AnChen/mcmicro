@@ -63,7 +63,7 @@ workflow MCMICRO {
             .map     { meta, image_tiles, dfp, ffp -> [meta, image_tiles] }
             | COMPRESS_PYSED
         ch_versions = ch_versions.mix(COMPRESS_PYSED.out.versions)
-        if (params.cleanup_workdir) {
+        if (!params.no_cleanup_slide) {
             COMPRESS_PYSED.out.tif | WORKDIR_CLEANUP_PYSED
         }
 
@@ -322,7 +322,7 @@ workflow MCMICRO {
 
         ch_versions = ch_versions.mix(MCQUANT.out.versions)
 
-        if (params.cleanup_workdir) {
+        if (!params.no_cleanup_slide) {
             MCQUANT.out.csv
                 .map { meta, csv -> [meta.id, meta] }
                 .join(ch_for_mcquant.map { meta, image, masks -> [meta.id, image, masks] })

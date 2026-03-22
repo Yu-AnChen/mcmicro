@@ -114,10 +114,10 @@
                     "enum": ["registration", "segmentation"],
                     "description": "Stop the pipeline after a specific stage. 'registration' stops after ASHLAR (skips segmentation and quantification). 'segmentation' stops after segmentation (skips quantification)."
                 },
-                "cleanup_workdir": {
+                "no_cleanup_slide": {
                     "type": "boolean",
                     "default": false,
-                    "description": "Delete large intermediate files from the work directory on a per-slide basis as soon as they are no longer needed. Frees disk space during the run at the cost of disabling resume for cleaned-up steps."
+                    "description": "Disable per-slide work directory cleanup. By default, large intermediate files (compressed TIFFs, registered images, segmentation masks) are deleted from the work directory as soon as they are no longer needed."
                 },
                 "marker_name_replace": {
                     "type": "string",
