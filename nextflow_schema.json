@@ -114,6 +114,11 @@
                     "enum": ["registration", "segmentation"],
                     "description": "Stop the pipeline after a specific stage. 'registration' stops after ASHLAR (skips segmentation and quantification). 'segmentation' stops after segmentation (skips quantification)."
                 },
+                "cleanup_workdir": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Delete large intermediate files from the work directory on a per-slide basis as soon as they are no longer needed. Frees disk space during the run at the cost of disabling resume for cleaned-up steps."
+                },
                 "marker_name_replace": {
                     "type": "string",
                     "default": "^\\d+_(?:[A-Z][a-z]+_)?|_(?:ArgoFluor|Alexa)\\w+$",

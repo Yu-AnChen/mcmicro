@@ -23,6 +23,7 @@ include { BFTOOLS_SHOWINF        } from '../modules/nf-core/bftools/showinf/main
 include { PRELUDE                } from '../subworkflows/local/prelude/main'
 include { EXTRACT_MARKERS        } from '../modules/local/extract_markers/main'
 include { COMPRESS_PYSED         } from '../modules/local/compress_pysed/main'
+include { WORKDIR_CLEANUP        } from '../modules/local/workdir_cleanup/main'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -61,6 +62,9 @@ workflow MCMICRO {
             .map     { meta, image_tiles, dfp, ffp -> [meta, image_tiles] }
             | COMPRESS_PYSED
         ch_versions = ch_versions.mix(COMPRESS_PYSED.out.versions)
+        if (params.cleanup_workdir) {
+            COMPRESS_PYSED.out.tif | WORKDIR_CLEANUP
+        }
 
         if (!params.marker_sheet) {
             EXTRACT_MARKERS(BFTOOLS_SHOWINF.out.xml)
@@ -316,6 +320,14 @@ workflow MCMICRO {
         }
 
         ch_versions = ch_versions.mix(MCQUANT.out.versions)
+
+        if (params.cleanup_workdir) {
+            MCQUANT.out.csv
+                .map { meta, csv -> [meta.id, meta] }
+                .join(ch_for_mcquant.map { meta, image, masks -> [meta.id, image, masks] })
+                .map { id, meta, image, masks -> [meta, [image, masks].flatten()] }
+                | WORKDIR_CLEANUP
+        }
 
     }
 
