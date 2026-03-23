@@ -64,7 +64,9 @@ workflow MCMICRO {
             | COMPRESS_PYSED
         ch_versions = ch_versions.mix(COMPRESS_PYSED.out.versions)
         if (!params.no_cleanup_slide) {
-            COMPRESS_PYSED.out.tif | WORKDIR_CLEANUP_PYSED
+            COMPRESS_PYSED.out.tif
+                .map { meta, f -> [meta, f, params.outdir] }
+                | WORKDIR_CLEANUP_PYSED
         }
 
         if (!params.marker_sheet) {
@@ -326,7 +328,7 @@ workflow MCMICRO {
             MCQUANT.out.csv
                 .map { meta, csv -> [meta.id, meta] }
                 .join(ch_for_mcquant.map { meta, image, masks -> [meta.id, image, masks] })
-                .map { id, meta, image, masks -> [meta, [image, masks].flatten()] }
+                .map { id, meta, image, masks -> [meta, [image, masks].flatten(), params.outdir] }
                 | WORKDIR_CLEANUP_MCQUANT
         }
 
