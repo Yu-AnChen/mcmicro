@@ -105,8 +105,8 @@ process COMPRESS_PYSED {
 
     # ── Main ──────────────────────────────────────────────────────────────────────
 
-    # pysed_path = '${image_file}'
-    # out_path   = '${image_file.name}'
+    pysed_path = '${image_file}'
+    out_path   = '${image_file.name}'
 
     pysed_path, out_path = Path(pysed_path), Path(out_path)
 
