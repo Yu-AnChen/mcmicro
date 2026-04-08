@@ -2,10 +2,7 @@ process COMPRESS_PYSED {
     tag "${meta.id}_${meta.cycle_number}"
     label 'process_single'
 
-
-    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'https://depot.galaxyproject.org/singularity/ashlar:1.18.0--pyhdfd78af_0' :
-        'yuanchen12/rcashlar:latest' }"
+    container "docker.io/yuanchen12/rcashlar:2026.4.1"
 
     input:
     tuple val(meta), path(image_file)
