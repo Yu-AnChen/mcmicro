@@ -1,6 +1,6 @@
 process MCCELLPOSE {
     tag "$meta.id"
-    label 'process_low'
+    label 'process_single'
     label 'process_gpu'
 
     container "docker.io/labsyspharm/mccellpose:1.0.3"
