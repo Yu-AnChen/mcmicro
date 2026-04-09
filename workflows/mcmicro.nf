@@ -24,6 +24,7 @@ include { PRELUDE                } from '../subworkflows/local/prelude/main'
 include { EXTRACT_MARKERS        } from '../modules/local/extract_markers/main'
 include { COMPRESS_PYSED         } from '../modules/local/compress_pysed/main'
 include { WORKDIR_CLEANUP as WORKDIR_CLEANUP_PYSED   } from '../modules/local/workdir_cleanup/main'
+include { WORKDIR_CLEANUP as WORKDIR_CLEANUP_ASHLAR  } from '../modules/local/workdir_cleanup/main'
 include { WORKDIR_CLEANUP as WORKDIR_CLEANUP_MCQUANT } from '../modules/local/workdir_cleanup/main'
 
 /*
@@ -240,7 +241,16 @@ workflow MCMICRO {
                 .map { meta, img -> [meta + [id: meta.id + '_' + img.fileName.toString().tokenize('.')[0]], img]}
                 .set { ch_segmentation_input }
         } else {
-            ch_segmentation_input = post_registration
+            if (!params.no_cleanup_slide) {
+                post_registration
+                    .map { meta, image -> [meta, image, params.outdir] }
+                    | WORKDIR_CLEANUP_ASHLAR
+                ch_segmentation_input = WORKDIR_CLEANUP_ASHLAR.out.done
+                    .join(post_registration)
+                    .map { meta, image -> [meta, image] }
+            } else {
+                ch_segmentation_input = post_registration
+            }
         }
 
         // Run Segmentation

@@ -5,6 +5,9 @@ process WORKDIR_CLEANUP {
     input:
     tuple val(meta), path(files), val(outdir)
 
+    output:
+    val(meta), emit: done
+
     script:
     """
     work_root=\$(dirname \$(dirname \$PWD))
@@ -22,6 +25,7 @@ process WORKDIR_CLEANUP {
             pub=\$(find "${outdir}" -name "\$fname" 2>/dev/null | head -1)
             if [ -n "\$pub" ] && [ "\$(stat -c%s "\$pub" 2>/dev/null)" = "\$src_size" ]; then
                 rm -f "\$real"
+                ln -s "\$pub" "\$real"
                 break
             fi
             if [ \$waited -ge 7200 ]; then
