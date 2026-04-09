@@ -124,6 +124,12 @@ workflow MCMICRO {
                     .dump(tag: 'ch_samplesheet (after BASICPY)')
             }
 
+            // Barrier: wait for all PRELUDE and EXTRACT_MARKERS tasks to finish
+            // before launching any ASHLAR task, to avoid I/O contention on the SSD.
+            ch_metadata_barrier = params.marker_sheet
+                ? PRELUDE.out.output_file_xml.collect().map { true }
+                : PRELUDE.out.output_file_xml.mix(EXTRACT_MARKERS.out.csv).collect().map { true }
+
             ch_samplesheet
                 .map{ meta, image_tiles, dfp, ffp ->
                     [meta.subMap('id', 'pixel_size'), [meta.cycle_number, image_tiles, dfp, ffp]]
@@ -131,6 +137,8 @@ workflow MCMICRO {
                 // FIXME: pass groupTuple size: from samplesheet cycle count
                 .groupTuple(sort: { a, b -> a[0] <=> b[0] } )
                 .map{ meta, cycles -> [meta, *cycles.collect{ it[1..-1] }.transpose()]}
+                .combine(ch_metadata_barrier)
+                .map{ meta, images, dfps, ffps, _ -> [meta, images, dfps, ffps] }
                 .dump(tag: 'ASHLAR in')
                 // flatten() handles list of empty-lists, turning it into a single empty list.
                 .multiMap{ meta, images, dfps, ffps ->
