@@ -22,135 +22,165 @@ process SUMMARY_XML {
 #! /usr/local/bin/python
 import xml.etree.ElementTree as ET
 
-def elementInTagConsistent(node, tag, attribute):
-  if len(node.findall('.//{*}' + tag)) != len(node.findall('.//{*}' + tag + "[@{}]".format(attribute))):
-    return False  # some elements missing tag
 
-  if len(set([e.attrib[attribute] for e in node.findall('.//{*}' + tag + "[@{}]".format(attribute))])) != 1:
-    return False  # different values
-  return True
+def elementInTagConsistent(elements, attribute):
+    values_present = [e.attrib[attribute] for e in elements if attribute in e.attrib]
+    if len(values_present) != len(elements):
+        return False  # some elements missing attribute
+    return len(set(values_present)) == 1
 
-def getAllValuesFromAttrib(node, tag, attribute):
-  return str([e.attrib[attribute] if attribute in e.attrib else '' for e in node.findall('.//{*}' + tag)])
 
-def getAllValuesFrom2Attrib(node, tag, attribute1, attribute2):
-  return str([
-  [e.attrib[attribute1] if attribute1 in e.attrib else '', e.attrib[attribute2] if attribute2 in e.attrib else '']
-  for e in node.findall('.//{*}' + tag)
-  ])
+def getAllValuesFromAttrib(elements, attribute):
+    return str([e.attrib[attribute] if attribute in e.attrib else "" for e in elements])
 
-check = '\u2705'
-cross = '\u274C'
+
+def getAllValuesFrom2Attrib(elements, attribute1, attribute2):
+    return str(
+        [
+            [
+                e.attrib[attribute1] if attribute1 in e.attrib else "",
+                e.attrib[attribute2] if attribute2 in e.attrib else "",
+            ]
+            for e in elements
+        ]
+    )
+
+
+check = "\u2705"
+cross = "\u274c"
 res = None
 
 data = [["variable_name", "value", "expected", "check"]]
 
-root = ET.parse('${xml}').getroot()
+root = ET.parse("${xml}").getroot()
 
-if not elementInTagConsistent(root, 'Pixels', 'SizeX') or not elementInTagConsistent(root, 'Pixels', 'SizeY') or \
-root.findall('.//{*}Pixels[@SizeX]')[0].attrib['SizeX'] != root.findall('.//{*}Pixels[@SizeY]')[0].attrib['SizeY']:
-  res = cross
+# Collect element lists once — avoids repeated full-tree traversals
+all_pixels = root.findall(".//{*}Pixels")
+all_planes = root.findall(".//{*}Plane")
+
+if (
+    not elementInTagConsistent(all_pixels, "SizeX")
+    or not elementInTagConsistent(all_pixels, "SizeY")
+    or all_pixels[0].attrib["SizeX"] != all_pixels[0].attrib["SizeY"]
+):
+    res = cross
 else:
-  res = check
+    res = check
 data.append(
-  [
-    'SizeX|SizeY',
-    getAllValuesFrom2Attrib(root, 'Pixels', 'SizeX', 'SizeY'),
-    'Same Integer',
-    res
-  ]
+    [
+        "SizeX|SizeY",
+        getAllValuesFrom2Attrib(all_pixels, "SizeX", "SizeY"),
+        "Same Integer",
+        res,
+    ]
 )
 
-if not elementInTagConsistent(root, 'Pixels', 'PhysicalSizeX') or \
-not elementInTagConsistent(root, 'Pixels', 'PhysicalSizeY') or \
-int(float(root.findall('.//{*}Pixels[@PhysicalSizeX]')[0].attrib['PhysicalSizeX']) * 1000) != \
-int(float(root.findall('.//{*}Pixels[@PhysicalSizeY]')[0].attrib['PhysicalSizeY']) * 1000):
-  res = cross
+if (
+    not elementInTagConsistent(all_pixels, "PhysicalSizeX")
+    or not elementInTagConsistent(all_pixels, "PhysicalSizeY")
+    or int(float(all_pixels[0].attrib["PhysicalSizeX"]) * 1000)
+    != int(float(all_pixels[0].attrib["PhysicalSizeY"]) * 1000)
+):
+    res = cross
 else:
-  res = check
+    res = check
 
 data.append(
-  [
-  "PhysicalSizeX|PhysicalSizeY",
-  getAllValuesFrom2Attrib(root, 'Pixels', 'PhysicalSizeX', 'PhysicalSizeY'),
-  "Numbers that are equal within 3 DP",
-  res
-  ]
+    [
+        "PhysicalSizeX|PhysicalSizeY",
+        getAllValuesFrom2Attrib(all_pixels, "PhysicalSizeX", "PhysicalSizeY"),
+        "Numbers that are equal within 3 DP",
+        res,
+    ]
 )
 
-if not elementInTagConsistent(root, 'Pixels', 'SizeC') or \
-root.findall('.//{*}Pixels[@SizeC]')[0].attrib['SizeC'] == 0:
-  res = cross
+if (
+    not elementInTagConsistent(all_pixels, "SizeC")
+    or all_pixels[0].attrib["SizeC"] == 0
+):
+    res = cross
 else:
-  res = check
+    res = check
 
 data.append(
-  [
-    'SizeC',
-    getAllValuesFromAttrib(root, 'Pixels', 'SizeC'),
-    'Consistent > 0 numbers',
-    res
-  ]
+    [
+        "SizeC",
+        getAllValuesFromAttrib(all_pixels, "SizeC"),
+        "Consistent > 0 numbers",
+        res,
+    ]
 )
 
 valid_physical_units = ["mm", "cm", "um", "µm", "reference_frame"]
 
-if not elementInTagConsistent(root, 'Pixels', 'PhysicalSizeXUnit') or \
-not elementInTagConsistent(root, 'Pixels', 'PhysicalSizeYUnit') or \
-root.findall('.//{*}Pixels[@PhysicalSizeXUnit]')[0].attrib['PhysicalSizeX'] != \
-root.findall('.//{*}Pixels[@PhysicalSizeYUnit]')[0].attrib['PhysicalSizeY'] or \
-root.findall('.//{*}Pixels[@PhysicalSizeXUnit]')[0].attrib['PhysicalSizeX'] not in valid_physical_units:
-  res = cross
+if (
+    not elementInTagConsistent(all_pixels, "PhysicalSizeXUnit")
+    or not elementInTagConsistent(all_pixels, "PhysicalSizeYUnit")
+    or all_pixels[0].attrib["PhysicalSizeX"] != all_pixels[0].attrib["PhysicalSizeY"]
+    or all_pixels[0].attrib["PhysicalSizeX"] not in valid_physical_units
+):
+    res = cross
 else:
-  res = check
+    res = check
 
 data.append(
-[
-  "PhysicalSizeXUnit|PhysicalSizeYUnit",
-  getAllValuesFrom2Attrib(root, 'Pixels', 'PhysicalSizeXUnit', 'PhysicalSizeYUnit'),
-  "Consistent units (mm, cm, um, µm, reference_frame)",
-  res
-]
+    [
+        "PhysicalSizeXUnit|PhysicalSizeYUnit",
+        getAllValuesFrom2Attrib(all_pixels, "PhysicalSizeXUnit", "PhysicalSizeYUnit"),
+        "Consistent units (mm, cm, um, µm, reference_frame)",
+        res,
+    ]
 )
 
-valid_datatypes = ['uint8', 'uint16', 'uint32', 'int8', 'int16', 'int32', 'float', 'double']
+valid_datatypes = [
+    "uint8",
+    "uint16",
+    "uint32",
+    "int8",
+    "int16",
+    "int32",
+    "float",
+    "double",
+]
 
-if not elementInTagConsistent(root, 'Pixels', 'Type') or \
-root.findall('.//{*}Pixels[@Type]')[0].attrib['Type'] not in valid_datatypes:
-  res = cross
+if (
+    not elementInTagConsistent(all_pixels, "Type")
+    or all_pixels[0].attrib["Type"] not in valid_datatypes
+):
+    res = cross
 else:
-  res = check
+    res = check
 
 data.append(
-[
-  "Type",
-  getAllValuesFromAttrib(root, 'Pixels', 'Type'),
-  "Consistent valid datatypes (uint8, float16...)",
-  res
-]
+    [
+        "Type",
+        getAllValuesFromAttrib(all_pixels, "Type"),
+        "Consistent valid datatypes (uint8, float16...)",
+        res,
+    ]
 )
 
-if not elementInTagConsistent(root, 'Plane', 'ExposureTime') or \
-not elementInTagConsistent(root, 'Plane', 'ExposureTimeUnit'):
-  res = cross
+if not elementInTagConsistent(all_planes, "ExposureTime") or not elementInTagConsistent(
+    all_planes, "ExposureTimeUnit"
+):
+    res = cross
 else:
-  res = check
+    res = check
 
 data.append(
-[
-  "ExposureTime|ExposureTimeUnit",
-  getAllValuesFrom2Attrib(root, 'Plane', 'ExposureTime', 'ExposureTimeUnit'),
-  "Consistent valid exposure time and units",
-  res
-]
+    [
+        "ExposureTime|ExposureTimeUnit",
+        getAllValuesFrom2Attrib(all_planes, "ExposureTime", "ExposureTimeUnit"),
+        "Consistent valid exposure time and units",
+        res,
+    ]
 )
 
 print(data)
 
-with open("${prefix}" + "_xml_mqc.tsv", 'w') as f:
-  f.write(
-    '\\n'.join(['\\t'.join(x) for x in data])
-  )
+with open("${prefix}" + "_xml_mqc.tsv", "w") as f:
+    f.write("\\n".join(["\\t".join(x) for x in data]))
+
     """
 }
 
