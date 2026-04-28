@@ -22,9 +22,9 @@ process MCQUANT {
     def prefix = task.ext.prefix ?: "${meta.id}"
     """
     chunkprop \
-        --masks $masks \
+        --mask $masks \
         --image $image \
-        --channel_names $markerfile \
+        --channel-names $markerfile \
         --output . \
         $args
 
