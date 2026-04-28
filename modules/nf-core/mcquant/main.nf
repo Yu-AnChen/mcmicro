@@ -20,9 +20,8 @@ process MCQUANT {
     script:
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
-    def VERSION = '1.5.4' // WARN: Version information not provided by tool on CLI. Please update this string when bumping container versions.
     """
-    python /app/CommandSingleCellExtraction.py \
+    chunkprop \
         --masks $masks \
         --image $image \
         --channel_names $markerfile \
@@ -31,7 +30,7 @@ process MCQUANT {
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        mcquant: $VERSION
+        mcquant: \$(chunkprop --version | sed 's/^.*chunkprop //' )
     END_VERSIONS
     """
 
@@ -43,7 +42,7 @@ process MCQUANT {
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        mcquant: $VERSION
+        mcquant: \$(chunkprop --version | sed 's/^.*chunkprop //' )
     END_VERSIONS
     """
 }
