@@ -73,7 +73,7 @@
          ▼                                                            │
   ch_segmentation_input                                               │
   [if !tma_dearray and !no_cleanup_slide:                             │
-   WORKDIR_CLEANUP_ASHLAR runs here to free slide work dir]           │
+   WORKDIR_CLEANUP_ASHLAR fires here (fire-and-forget)]              │
   ┌──────┴──────────────────────────────┐                             │
   │             │                       │                             │
   ▼             ▼                       ▼                             │

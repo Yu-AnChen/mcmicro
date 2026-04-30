@@ -253,12 +253,8 @@ workflow MCMICRO {
                 post_registration
                     .map { meta, image -> [meta, image, params.outdir] }
                     | WORKDIR_CLEANUP_ASHLAR
-                ch_segmentation_input = WORKDIR_CLEANUP_ASHLAR.out.done
-                    .join(post_registration)
-                    .map { meta, image -> [meta, image] }
-            } else {
-                ch_segmentation_input = post_registration
             }
+            ch_segmentation_input = post_registration
         }
 
         // Run Segmentation
