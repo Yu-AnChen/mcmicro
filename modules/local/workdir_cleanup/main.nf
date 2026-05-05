@@ -26,6 +26,8 @@ process WORKDIR_CLEANUP {
         while true; do
             pub=\$(find "${outdir}" -name "\$fname" 2>/dev/null | head -1)
             if [ -n "\$pub" ] && [ "\$(stat -c%s "\$pub" 2>/dev/null)" = "\$src_size" ]; then
+                # TODO: test atomic swap on WSL — mv(rename) atomicity over
+                # a cross-filesystem NAS mount may behave differently there
                 current_tmp="\${real}.tmp"
                 ln -s "\$pub" "\$current_tmp"
                 mv "\$current_tmp" "\$real"
