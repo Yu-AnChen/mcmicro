@@ -121,8 +121,8 @@
                 },
                 "marker_name_replace": {
                     "type": "string",
-                    "default": "^\\d+_(?:[A-Z][a-z]+_)?|_(?:ArgoFluor|Alexa)\\w+$",
-                    "description": "Regex pattern applied to channel names auto-extracted from OME metadata. Default strips leading numeric prefixes (e.g. '01_DNA_1' -> 'DNA_1'). Set to an empty string to disable. Only used when --marker_sheet is not provided."
+                    "default": "^\\d+_[A-Za-z][A-Za-z0-9-]*_(?!.*(?:ArgoFluor|Alexa|CF)\\d)|^\\d+_|_(?:ArgoFluor|Alexa|CF)\\w+$",
+                    "description": "Regex pattern applied to channel names auto-extracted from OME metadata. Default strips the leading numeric index and a trailing numbered-dye suffix (ArgoFluor/Alexa/CF), keeping the marker (e.g. '19_Catenin_ArgoFluor845' -> 'Catenin'); for dye-less channels it keeps the trailing stain name (e.g. '01_Nucleus_Hoechst' -> 'Hoechst'). Set to an empty string to disable. Only used when --marker_sheet is not provided."
                 }
             }
         },
