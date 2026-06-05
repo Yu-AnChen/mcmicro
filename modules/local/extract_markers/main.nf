@@ -70,7 +70,7 @@ process EXTRACT_MARKERS {
         pattern = re.compile(pargs.replace)
         names = [pattern.sub('', n) for n in names]
 
-    placeholder = re.compile(r'^Channel\s*\d+$', re.IGNORECASE)
+    placeholder = re.compile(r'^Channel\\s*\\d+\$', re.IGNORECASE)
     for name in names:
         if placeholder.match(name):
             print(f'!!! WARNING !!! Channel name looks like an unset OME placeholder: "{name}"', file=sys.stderr)
